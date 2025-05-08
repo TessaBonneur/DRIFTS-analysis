@@ -27,56 +27,6 @@ def read_logfile(setup: Literal['LP IR VMB','DeNOx'], logfile_path: str):
     Returns:
     - logfile: DataFrame with the formatted logfile data.
     '''
-    global Date, Time, DateTime, Oven_temp, H2_flow, H2_sp, CO_flow, CO_sp, N2_bubbler_flow, N2_bubbler_sp, N2_flow, N2_sp, CO2_flow, CO2_sp, Oven_actual_sp, Oven_ramp, O2_flow, O2_sp
-
-    if setup == 'LP IR VMB':
-        Date = 'Date'
-        Time = 'Time'
-        DateTime = 'DateTime'
-
-        N2_bubbler_sp = 'SP N2-bub'
-        N2_bubbler_flow = 'Flow N2-bub'
-        N2_sp = 'SP N2'
-        N2_flow = 'flow N2'
-        CO2_sp = 'Sp CO2'
-        CO2_flow = 'flow CO2'
-        H2_sp = 'SP H2'
-        H2_flow = 'flow H2'
-        CO_sp = 'SP CO'
-        CO_flow = 'flow CO'
-        O2_sp = 'SP O2'
-        O2_flow = 'flow O2'
-  
-        Oven_actual_sp = 'Oven actual SP'
-        Oven_temp = 'Oven temp'
-        Oven_ramp = 'oven ramp'
-
-    global He_low_sp, He_low_flow, NO_sp, NO_flow, Propene_sp, Propene_flow, Target_Oven_sp, Oven_temp_internal, Oven_percent
-
-    if setup == 'DeNOx':
-        Date = 'Date'
-        Time = 'Time'
-        DateTime = 'DateTime'
-
-        He_low_sp = 'SP He Low'
-        He_low_flow = 'Flow He Low'
-        CO_sp = 'SP 2%CO'
-        CO_flow = 'Flow 2%CO'
-        H2_sp = 'SP H2'
-        H2_flow = 'Flow H2'
-        NO_sp = 'SP 1%NO'
-        NO_flow = 'Flow 1%NO'
-        Propene_sp = 'SP 0.5%Propene'
-        Propene_flow = 'Flow 0.5%Propene'
-        O2_sp = 'sp O2'
-        O2_flow = 'Flow O2'
- 
-        Oven_actual_sp = 'Oven actual SP'
-        Oven_temp = 'Oven Temp'
-        Oven_ramp = 'Oven Ramp'
-        Target_Oven_sp = 'Target Oven SP'
-        Oven_temp_internal = 'Oven Temp internal'
-        Oven_percent = 'Oven %'
 
     # Make a list of the txt files in the folder
     logfile_files = sorted([file for file in os.listdir(logfile_path) if file.endswith('.txt')])
@@ -109,27 +59,87 @@ def read_logfile(setup: Literal['LP IR VMB','DeNOx'], logfile_path: str):
     except:
         raise ValueError('Error with datetime conversion!')
 
-        # Drop the original 'Date' and 'Time' columns
+    # Drop the original 'Date' and 'Time' columns
     logfile.drop(columns=[Date, Time], inplace=True)
 
-    # Rename O2 to CO
+    # Rename columns based on the setup
     if setup == 'LP IR VMB':
-        print('Renaming O2 to CO...')
-        logfile.rename(columns={'SP O2': 'SP CO', 'flow O2': 'flow CO'}, inplace=True)
+        logfile.rename(columns={
+            'SP N2-bub': 'N2_bubbler_sp',
+            'Flow N2-bub': 'N2_bubbler_flow',
+            'SP N2': 'N2_sp',
+            'flow N2': 'N2_flow',
+            'Sp CO2': 'CO2_sp',
+            'flow CO2': 'CO2_flow',
+            'SP H2': 'H2_sp',
+            'flow H2': 'H2_flow',
+            'SP CO': 'CO_sp',
+            'flow CO': 'CO_flow',
+            'SP O2': 'O2_sp',
+            'flow O2': 'O2_flow',
+            'Oven actual SP': 'Oven_actual_sp',
+            'Oven temp': 'Oven_temp',
+            'oven ramp': 'Oven_ramp'
+        }, inplace=True)
 
-    # Check if the correct logfile was used
     if setup == 'DeNOx':
-        try:
-            logfile[H2_flow]
-        except:
-            print('Wrong logfile used! Converting to correct format (assuming you used the propane dehydrogenation labview)')
-            ## If the wrong labview was used, the column names are incorrect! This cell fixes that.
-            logfile.columns = ['SP 2%CO', 'Flow 2%CO', 'SP H2', 'Flow H2', 'SP He Low', 'Flow He Low', 'Zeroes 1', 'Zeroes 2', 'Zeroes 3', 'Lil Negative', 'SP O2', 'Flow O2', 'Oven SP', 'Oven Ramp', 'Oven Temp','Oven Temp internal', 'Oven %', 'Oven actual SP', 'DateTime']
-    
+        logfile.rename(columns={
+            'SP He Low': 'He_low_sp',
+            'Flow He Low': 'He_low_flow',
+            'SP 2%CO': 'CO_sp',
+            'Flow 2%CO': 'CO_flow',
+            'SP H2': 'H2_sp',
+            'Flow H2': 'H2_flow',
+            'SP 1%NO': 'NO_sp',
+            'Flow 1%NO': 'NO_flow',
+            'SP 0.5%Propene': 'Propene_sp',
+            'Flow 0.5%Propene': 'Propene_flow',
+            'sp O2': 'O2_sp',
+            'Flow O2': 'O2_flow',
+            'Oven actual SP': 'Oven_actual_sp',
+            'Oven Temp': 'Oven_temp',
+            'Oven Ramp': 'Oven_ramp',
+            'Target Oven SP': 'Target_Oven_sp',
+            'Oven Temp internal': 'Oven_temp_internal',
+            'Oven %': 'Oven_percent'
+        }, inplace=True)
+
     print('Logfile read successfully.\n')
 
     # Preview the logfile
     return logfile
+
+# Define variables with the names of the columns in the logfile. Callable with DRIFTS_package.Date, DRIFTS_package.Time, etc.
+Date = 'Date'
+Time = 'Time'
+DateTime = 'DateTime'
+N2_bubbler_sp = 'N2_bubbler_sp'
+N2_bubbler_flow = 'N2_bubbler_flow'
+N2_sp = 'N2_sp'
+N2_flow = 'N2_flow'
+CO2_sp = 'CO2_sp'
+CO2_flow = 'CO2_flow'
+H2_sp = 'H2_sp'
+H2_flow = 'H2_flow'
+CO_sp = 'CO_sp'
+CO_flow = 'CO_flow'
+O2_sp = 'O2_sp'
+O2_flow = 'O2_flow'
+Oven_actual_sp = 'Oven_actual_sp'
+Oven_temp = 'Oven_temp'
+Oven_ramp = 'Oven_ramp'
+Target_Oven_sp = 'Target_Oven_sp'
+Oven_temp_internal = 'Oven_temp_internal'
+Oven_percent = 'Oven_percent'
+He_low_sp = 'He_low_sp'
+He_low_flow = 'He_low_flow'
+CO_sp = 'CO_sp'
+CO_flow = 'CO_flow'
+NO_sp = 'NO_sp'
+NO_flow = 'NO_flow'
+Propene_sp = 'Propene_sp'
+Propene_flow = 'Propene_flow'
+
 
 def xaxis_inversion(spectra: pd.DataFrame):
     """
