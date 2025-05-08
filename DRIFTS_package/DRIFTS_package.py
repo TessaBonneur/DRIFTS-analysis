@@ -384,13 +384,14 @@ def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background
         current_temp = row[temp_column]
 
         # Find the closest temperature in the background DataFrame
+        background_spectra = background_spectra.copy()  # Ensure a proper copy to avoid SettingWithCopyWarning
         background_spectra['temp_diff'] = np.abs(background_spectra[temp_column] - current_temp)
         closest_row = background_spectra.loc[background_spectra['temp_diff'].idxmin()]
         
         # Subtract the spectrum from the reaction spectrum
         corrected_reaction.loc[idx] = reaction_intensities.loc[idx] - inert_rampdown_intensities.loc[closest_row.name]
 
-        # add the temp diff column to a list to check if the temperatures are correct
+        # Add the temp diff column to a list to check if the temperatures are correct
         temp_diffs.append(closest_row['temp_diff'])
 
     return corrected_reaction, temp_diffs
