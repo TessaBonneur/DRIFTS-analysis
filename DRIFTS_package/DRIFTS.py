@@ -190,7 +190,7 @@ def parse_spectra(spectra_path: str, invert_xaxis = True, delete_previous = Fals
         spectra_filenames = spectra.copy().index
         spectra_files = sorted([file for file in os.listdir(spectra_path) if file.endswith('.dx')])
 
-        print('Found raw_spectra.csv; spectra loaded successfully. If reloading is required, delete the raw_spectra.csv file in the folder.')
+        print('Found raw_spectra.csv; spectra loaded successfully. If reloading is required, specify delete_previous = True or delete the raw_spectra.csv file in the folder.')
     except:
         # If the spectra are not yet loaded, load them
         print('No csv found. Loading spectra from dx files...')
