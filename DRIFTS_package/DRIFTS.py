@@ -365,15 +365,15 @@ def merge_spectra_logfile(spectra_path: str, logfile_path: str, setup: Literal['
 # Important! Before using background correction, make two separate dataframes where one contains the reaction spectra and the other contains the background spectra!
 # This can be done by using the 'merge_spectra_logfile' function above and then filtering the dataframes based on the temperature, time, gas flows, etc.
 
-def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background_spectra: pd.DataFrame, temp_column: str = 'Oven Temp'):
+def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background_spectra: pd.DataFrame, temp_column: str = 'Oven Temp', return_temp_column: bool = False):
     """
     Perform background correction by subtracting the spectrum from 'background' with the closest temperature.
 
     Parameters:
     - reaction: DataFrame with reaction data, indexed by datetime, with intensity columns for wavenumbers
-      and a temperature column (e.g., 'Oven temp').
+      and a temperature column (e.g., 'Oven_temp').
     - background: DataFrame with spectra during inert rampdown, indexed by datetime, with intensity columns
-      and a temperature column (e.g., 'Oven temp').
+      and a temperature column (e.g., 'Oven_temp').
     - temp_column: Name of the column indicating temperature in both DataFrames.
 
     Returns:
@@ -403,6 +403,10 @@ def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background
 
         # Add the temp diff column to a list to check if the temperatures are correct
         temp_diffs.append(closest_row['temp_diff'])
+
+    if return_temp_column == True:
+        # Add the temperature column to the corrected DataFrame
+        corrected_reaction[temp_column] = reaction_spectra[temp_column]
 
     return corrected_reaction, temp_diffs
 
