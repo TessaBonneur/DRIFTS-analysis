@@ -15,15 +15,6 @@ This script is used to analyze DRIFTS spectra from either DeNOx or LP IR VMB set
 - ...and many other functions used for data analysis which might not be useful for everyone.
 '''
 
-def reload_package():
-    import importlib
-    from DRIFTS_package import DRIFTS_package as ir
-    try:
-        importlib.reload(ir)
-        return print('Succesfully reloaded {}'.format(ir))
-    except:
-        raise ImportError('Failed to reload package. Define and use reload_package() instead.')
-
 # define the columns for a particular logfile
 def read_logfile(setup: Literal['LP IR VMB','DeNOx'], logfile_path: str):
     '''
