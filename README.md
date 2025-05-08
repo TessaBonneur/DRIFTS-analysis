@@ -34,19 +34,19 @@ My_Scripts
 ```
 
 ## Usage
-Parse a TGA file using 
+Parse DRIFTS files from a folder using:
 ```python
 DRIFTS_spectra = ir.parse_spectra('*path-to-your-file*')
 ```
 Make a quick plot to check: 
 
 ```python
-quick_plot(DRIFTS_spectra)
+ir.quick_plot(DRIFTS_spectra)
 ```
 Combine with logfile:
 
 ```python
-merged_data = merge_spectra_logfile('*path to spectra*', '*path to logfile*')
+merged_data = ir.merge_spectra_logfile('*path to spectra*', '*path to logfile*')
 ```
 
 Check the example notebook for more info how to use this package.
@@ -59,3 +59,6 @@ If you want to contribute, let me know.
 
 ## Authors
 Jan den Hollander, Utrecht University
+
+## Acknowledgements
+Package structure was adapted from pyTGA, built by Sebastian Rejman
