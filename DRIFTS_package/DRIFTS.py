@@ -16,7 +16,7 @@ This script is used to analyze DRIFTS spectra from either DeNOx or LP IR VMB set
 '''
 
 # define the columns for a particular logfile
-def read_logfile(setup: Literal['LP IR VMB','DeNOx'], logfile_path: str):
+def read_logfile(setup: Literal['LP IR VMB','DeNOx'] = 'DeNOx', logfile_path: str = 'data'):
     '''
     Read the logfile from the specified path and format it.
     
@@ -156,7 +156,7 @@ def xaxis_inversion(spectra: pd.DataFrame):
     return spectra.iloc[:, ::-1]  # Reverse the order of columns
 
 
-def parse_spectra(spectra_path: str, invert_xaxis = True, delete_previous = False):
+def parse_spectra(spectra_path: str = 'data', invert_xaxis = True, delete_previous = False):
     '''
     Parse the spectra from the specified path. If the spectra have been parsed before, it will load them from the csv file.
 
@@ -273,7 +273,7 @@ def quick_plot(spectra_to_plot: pd.DataFrame, skip: int=10, save = True):  # mak
 
     plt.show()
 
-def merge_spectra_logfile(spectra_path: str, logfile_path: str, setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', spectra_start_time: Literal['YYYY-MM-DD HH:MM:SS'] = None): # if spectra_start_time is None, it will use the first time in the logfile. 
+def merge_spectra_logfile(spectra_path: str = 'data', logfile_path: str = 'data', setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', spectra_start_time: Literal['YYYY-MM-DD HH:MM:SS'] = None): # if spectra_start_time is None, it will use the first time in the logfile. 
     '''
     Merge spectra and logfile based on the start time of the logfile. If the spectra_start_time is not None, it will use that time as the start time for the spectra.
 
@@ -365,7 +365,7 @@ def merge_spectra_logfile(spectra_path: str, logfile_path: str, setup: Literal['
 # Important! Before using background correction, make two separate dataframes where one contains the reaction spectra and the other contains the background spectra!
 # This can be done by using the 'merge_spectra_logfile' function above and then filtering the dataframes based on the temperature, time, gas flows, etc.
 
-def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background_spectra: pd.DataFrame, temp_column: str = 'Oven Temp', return_temp_column: bool = False):
+def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background_spectra: pd.DataFrame, temp_column: str = Oven_temp, return_temp_column: bool = False):
     """
     Perform background correction by subtracting the spectrum from 'background' with the closest temperature.
 
@@ -749,27 +749,30 @@ def save_lightoff(lightoff_IR, lightoff_GC, lightout_IR, lightout_GC):    # call
 
 def append_lightoff(lightoff_IR = None, lightoff_GC = None, lightout_IR = None, lightout_GC = None):    # call this filename
     
+
     # call this filename
     filename = os.getcwd().split('\\')[-1]
-    filename
 
     # read the file
     lightoff_temperatures = pd.read_csv(r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\Lightoff temperatures.csv', index_col=0)
 
-    # check if the row name already exists
-    if filename in lightoff_temperatures.index:
-        print('Row already exists, overwriting')
-        # remove the row with the same name
-        lightoff_temperatures = lightoff_temperatures.drop(filename)
-
+    if lightoff_IR == None and lightoff_GC == None and lightout_IR == None and lightout_GC == None:
+        return lightoff_temperatures
     else:
-        print('Row does not exist, adding new row')
-    
-    # append the new lightoff temperatures to the file
-    lightoff_temperatures_new = pd.concat([lightoff_temperatures, pd.DataFrame({'Lightoff IR': [lightoff_IR], 'Lightoff GC': [lightoff_GC], 'Lightout IR': [lightout_IR], 'Lightout GC': [lightout_GC]}, index=[filename])])
-    lightoff_temperatures_new.sort_index(inplace=True)
-    
-    # export the file
-    lightoff_temperatures_new.to_csv(r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\Lightoff temperatures.csv')
+        # check if the row name already exists
+        if filename in lightoff_temperatures.index:
+            print('Row already exists, overwriting')
+            # remove the row with the same name
+            lightoff_temperatures = lightoff_temperatures.drop(filename)
+
+        else:
+            print('Row does not exist, adding new row')
+        
+        # append the new lightoff temperatures to the file
+        lightoff_temperatures_new = pd.concat([lightoff_temperatures, pd.DataFrame({'Lightoff IR': [lightoff_IR], 'Lightoff GC': [lightoff_GC], 'Lightout IR': [lightout_IR], 'Lightout GC': [lightout_GC]}, index=[filename])])
+        lightoff_temperatures_new.sort_index(inplace=True)
+        
+        # export the file
+        lightoff_temperatures_new.to_csv(r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\Lightoff temperatures.csv')
 
     return lightoff_temperatures_new
