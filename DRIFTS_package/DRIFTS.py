@@ -16,7 +16,7 @@ This script is used to analyze DRIFTS spectra from either DeNOx or LP IR VMB set
 '''
 
 # define the columns for a particular logfile
-def read_logfile(setup: Literal['LP IR VMB','DeNOx'] = 'DeNOx', logfile_path: str = 'data'):
+def read_logfile(setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', logfile_path: str = 'data'):
     '''
     Read the logfile from the specified path and format it.
     
@@ -56,8 +56,8 @@ def read_logfile(setup: Literal['LP IR VMB','DeNOx'] = 'DeNOx', logfile_path: st
         global reaction_date
         reaction_date = str(logfile['DateTime'].iloc[0].date())  # Store the date of the first measurement for later use
 
-    except:
-        raise ValueError('Error with datetime conversion!')
+    except Exception as e:
+        raise Exception(f'Error with datetime conversion: {e}')
 
     # Drop the original 'Date' and 'Time' columns
     logfile.drop(columns=[Date, Time], inplace=True)
@@ -382,7 +382,7 @@ def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background
     """
     # Separate the intensity columns (wavenumbers) from metadata by selecting only float columns
     reaction_intensities = reaction_spectra[[col for col in reaction_spectra.columns if isinstance(col, float)]]
-    inert_rampdown_intensities = background_spectra[[col for col in reaction_spectra.columns if isinstance(col, float)]]
+    background_intensities = background_spectra[[col for col in reaction_spectra.columns if isinstance(col, float)]]
 
     # Create a new DataFrame for corrected spectra
     corrected_reaction = reaction_intensities.copy()
@@ -399,7 +399,7 @@ def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background
         closest_row = background_spectra.loc[background_spectra['temp_diff'].idxmin()]
         
         # Subtract the spectrum from the reaction spectrum
-        corrected_reaction.loc[idx] = reaction_intensities.loc[idx] - inert_rampdown_intensities.loc[closest_row.name]
+        corrected_reaction.loc[idx] = reaction_intensities.loc[idx] - background_intensities.loc[closest_row.name]
 
         # Add the temp diff column to a list to check if the temperatures are correct
         temp_diffs.append(closest_row['temp_diff'])
@@ -410,7 +410,7 @@ def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background
 
     return corrected_reaction, temp_diffs
 
-def linear_baseline_correction(spectra: pd.DataFrame, type: Literal['v1', 'v2'] = 'v1', area: tuple= (2600, 2400)):
+def linear_baseline_correction(spectra: pd.DataFrame, type: Literal['v1', 'v2'] = 'v1', area: tuple= (2600, 2400), temp_column: str = None):
     """
     Perform linear baseline correction on the specdtra.
 
@@ -422,7 +422,12 @@ def linear_baseline_correction(spectra: pd.DataFrame, type: Literal['v1', 'v2'] 
     Returns:
     - corrected_spectra: DataFrame with the corrected spectra.
     """
-    spectra_noT = spectra.copy().iloc[:,:-1]
+
+    if temp_column is not None:
+        spectra_noT = spectra.copy().drop(columns=[temp_column])  # Drop the temperature column if it exists
+    else:
+        spectra_noT = spectra.copy()
+
     spectra_noT.columns = spectra_noT.columns.astype(float)
 
     if type == 'v1':
@@ -441,7 +446,8 @@ def linear_baseline_correction(spectra: pd.DataFrame, type: Literal['v1', 'v2'] 
         # add the last column (the number of the spectrum) to the corrected spectra
         spectra_v1_corrected = spectra_v1_corrected.copy()
 
-        spectra_v1_corrected['T'] = spectra['T']
+        if temp_column is not None:
+            spectra_v1_corrected[temp_column] = spectra[temp_column]
         
         return spectra_v1_corrected
 
@@ -460,7 +466,9 @@ def linear_baseline_correction(spectra: pd.DataFrame, type: Literal['v1', 'v2'] 
             selected_area.iloc[n,:] = selected_area.copy().iloc[n,:] - linear_baseline_v2[n]
 
         spectra_v2_corrected = selected_area.copy()
-        spectra_v2_corrected['T'] = spectra['T']
+
+        if temp_column is not None:
+            spectra_v2_corrected[temp_column] = spectra[temp_column]
 
         return spectra_v2_corrected
     
