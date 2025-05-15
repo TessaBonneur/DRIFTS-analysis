@@ -16,7 +16,7 @@ This script is used to analyze DRIFTS spectra from either DeNOx or LP IR VMB set
 '''
 
 # define the columns for a particular logfile
-def read_logfile(setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', logfile_path: str = 'data'):
+def read_logfile(setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', logfile_path: str = 'data', delete_previous: bool = False):
     '''
     Read the logfile from the specified path and format it.
     
@@ -28,83 +28,96 @@ def read_logfile(setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', logfile_path: s
     - logfile: DataFrame with the formatted logfile data.
     '''
 
-    # Make a list of the txt files in the folder
-    logfile_files = sorted([file for file in os.listdir(logfile_path) if file.endswith('.txt')])
+    if delete_previous == True:
+        # delete the logfile.csv file if it exists
+        try:
+            os.remove(logfile_path + '/logfile.csv')
+            print('Deleted previous logfile.csv file.')
+        except:
+            print('No previous logfile.csv file found.')
 
-    # Check if the logfile files are empty
-    if len(logfile_files) == 0:
-        raise ValueError('No logfile found in the specified path.')
-
-    global logfile
-
-    # if there are multiple logfiles, combine them, else: just read the one
-    if len(logfile_files) > 1:
-        print('Multiple logfiles found! Combining them...')
-        logfile = pd.concat([pd.read_csv(logfile_path + '\\' + i, sep='\t', skiprows=2) for i in logfile_files])
-    else:
-        logfile = pd.read_csv(logfile_path + '\\' + logfile_files[0], sep='\t', skiprows=2)  # Adjust `sep` and `skiprows` as needed
-
-    print('Converting logfile date and time to pandas DateTime...')
-
+    # Try to load previously parsed logfile
     try:
-        if setup == 'DeNOx':
-            logfile['DateTime'] = pd.to_datetime(logfile['Date'] + ' ' + logfile['Time'], format='%d-%b-%Y %H:%M:%S')#
+        logfile = pd.read_csv(logfile_path + '/logfile.csv', index_col=0)
+        print('Logfile loaded successfully. If reloading is required, delete the logfile.csv file in the folder.')
+        return logfile
+    except:
+        print('No logfile found. Loading logfile from the specified path...')
 
+        # Make a list of the txt files in the folder
+        logfile_files = sorted([file for file in os.listdir(logfile_path) if file.endswith('.txt')])
+
+        # Check if the logfile files are empty
+        if len(logfile_files) == 0:
+            raise ValueError('No logfile found in the specified path.')
+
+        # if there are multiple logfiles, combine them, else: just read the one
+        if len(logfile_files) > 1:
+            print('Multiple logfiles found! Combining them...')
+            logfile = pd.concat([pd.read_csv(logfile_path + '\\' + i, sep='\t', skiprows=2) for i in logfile_files])
+        else:
+            logfile = pd.read_csv(logfile_path + '\\' + logfile_files[0], sep='\t', skiprows=2)  # Adjust `sep` and `skiprows` as needed
+
+        print('Converting logfile date and time to pandas DateTime...')
+        try:
+            if setup == 'DeNOx':
+                logfile['DateTime'] = pd.to_datetime(logfile['Date'] + ' ' + logfile['Time'], format='mixed', dayfirst=True, errors='coerce')
+
+            if setup == 'LP IR VMB':
+                logfile['DateTime'] = pd.to_datetime(logfile['Date'] + ' ' + logfile['Time'], format='%m/%d/%Y %H:%M:%S')
+
+            #global reaction_date
+            #reaction_date = str(logfile['DateTime'].iloc[0].date())  # Store the date of the first measurement for later use
+
+        except Exception as e:
+            raise Exception(f'Error with datetime conversion: {e}')
+
+        # Rename columns based on the setup
         if setup == 'LP IR VMB':
-            logfile['DateTime'] = pd.to_datetime(logfile['Date'] + ' ' + logfile['Time'], format='%m/%d/%Y %H:%M:%S')
+            logfile.rename(columns={
+                'SP N2-bub': 'N2_bubbler_sp',
+                'Flow N2-bub': 'N2_bubbler_flow',
+                'SP N2': 'N2_sp',
+                'flow N2': 'N2_flow',
+                'Sp CO2': 'CO2_sp',
+                'flow CO2': 'CO2_flow',
+                'SP H2': 'H2_sp',
+                'flow H2': 'H2_flow',
+                'SP CO': 'CO_sp',
+                'flow CO': 'CO_flow',
+                'SP O2': 'O2_sp',
+                'flow O2': 'O2_flow',
+                'Oven actual SP': 'Oven_actual_sp',
+                'Oven temp': 'Oven_temp',
+                'oven ramp': 'Oven_ramp'
+            }, inplace=True)
 
-        global reaction_date
-        reaction_date = str(logfile['DateTime'].iloc[0].date())  # Store the date of the first measurement for later use
+        if setup == 'DeNOx':
+            logfile.rename(columns={
+                'SP He Low': 'He_low_sp',
+                'Flow He Low': 'He_low_flow',
+                'SP 2%CO': 'CO_sp',
+                'Flow 2%CO': 'CO_flow',
+                'SP H2': 'H2_sp',
+                'Flow H2': 'H2_flow',
+                'SP 1%NO': 'NO_sp',
+                'Flow 1%NO': 'NO_flow',
+                'SP 0.5%Propene': 'Propene_sp',
+                'Flow 0.5%Propene': 'Propene_flow',
+                'sp O2': 'O2_sp',
+                'Flow O2': 'O2_flow',
+                'Oven actual SP': 'Oven_actual_sp',
+                'Oven Temp': 'Oven_temp',
+                'Oven Ramp': 'Oven_ramp',
+                'Target Oven SP': 'Target_Oven_sp',
+                'Oven Temp internal': 'Oven_temp_internal',
+                'Oven %': 'Oven_percent'
+            }, inplace=True)
 
-    except Exception as e:
-        raise Exception(f'Error with datetime conversion: {e}')
+        print('Logfile read successfully.\n')
 
-    # Drop the original 'Date' and 'Time' columns
-    logfile.drop(columns=[Date, Time], inplace=True)
-
-    # Rename columns based on the setup
-    if setup == 'LP IR VMB':
-        logfile.rename(columns={
-            'SP N2-bub': 'N2_bubbler_sp',
-            'Flow N2-bub': 'N2_bubbler_flow',
-            'SP N2': 'N2_sp',
-            'flow N2': 'N2_flow',
-            'Sp CO2': 'CO2_sp',
-            'flow CO2': 'CO2_flow',
-            'SP H2': 'H2_sp',
-            'flow H2': 'H2_flow',
-            'SP CO': 'CO_sp',
-            'flow CO': 'CO_flow',
-            'SP O2': 'O2_sp',
-            'flow O2': 'O2_flow',
-            'Oven actual SP': 'Oven_actual_sp',
-            'Oven temp': 'Oven_temp',
-            'oven ramp': 'Oven_ramp'
-        }, inplace=True)
-
-    if setup == 'DeNOx':
-        logfile.rename(columns={
-            'SP He Low': 'He_low_sp',
-            'Flow He Low': 'He_low_flow',
-            'SP 2%CO': 'CO_sp',
-            'Flow 2%CO': 'CO_flow',
-            'SP H2': 'H2_sp',
-            'Flow H2': 'H2_flow',
-            'SP 1%NO': 'NO_sp',
-            'Flow 1%NO': 'NO_flow',
-            'SP 0.5%Propene': 'Propene_sp',
-            'Flow 0.5%Propene': 'Propene_flow',
-            'sp O2': 'O2_sp',
-            'Flow O2': 'O2_flow',
-            'Oven actual SP': 'Oven_actual_sp',
-            'Oven Temp': 'Oven_temp',
-            'Oven Ramp': 'Oven_ramp',
-            'Target Oven SP': 'Target_Oven_sp',
-            'Oven Temp internal': 'Oven_temp_internal',
-            'Oven %': 'Oven_percent'
-        }, inplace=True)
-
-    print('Logfile read successfully.\n')
+        # Export the logfile to a csv file 
+        logfile.to_csv(logfile_path + '/logfile.csv', index=False)
 
     # Preview the logfile
     return logfile
@@ -303,8 +316,8 @@ def merge_spectra_logfile(spectra_path: str = 'data', logfile_path: str = 'data'
 
         print('Using first logfile time (' + str(logfile['DateTime'].iloc[0]) + ') as start time of spectra.')
 
-        start_time = logfile['DateTime'].iloc[0]
-
+        start_time = pd.to_datetime(logfile['DateTime'].iloc[0])
+    
     else:
         # Your custom time
         try:
@@ -319,21 +332,25 @@ def merge_spectra_logfile(spectra_path: str = 'data', logfile_path: str = 'data'
         # Manually assign timestamps to spectra based on their numbering. Assumes spectra filenames are ordered (_0001, _0002, etc.)
 
         # Adjust this interval if needed, default is 1 spectrum per minute
-        time_interval = pd.Timedelta(minutes=1) 
+        time_interval = pd.Timedelta(minutes=1)
 
-        spectra['DateTime'] = [start_time + i * time_interval for i in range(len(spectra_filenames))]   # This assumes the first spectrum is at the start_time
+        spectra['DateTime'] = pd.to_datetime([start_time + i * time_interval for i in range(len(spectra_filenames))])   # This assumes the first spectrum is at the start_time
         spectra.index = spectra['DateTime']
         spectra.drop(columns=['DateTime'], inplace=True)
             
         #spectra.columns = spectra.columns.astype(float)  # Convert column names to float
-    except:
-        print('Error with datetime conversion!')
+    except Exception as e:
+        print('Error with datetime assignment: {}'.format(e))
 
     try:
         global merged_data
 
-        print('Merging spectra with logfile...')
+        # Convert the DateTime column in the logfile to pandas DateTime format  
+        logfile['DateTime'] = pd.to_datetime(logfile['DateTime'])
+        
         # Merge spectral data with logfile information
+        print('Merging spectra with logfile...')
+
         merged_data = pd.merge_asof(spectra.sort_values('DateTime'), logfile.sort_values('DateTime'), on='DateTime')
 
         # Set the DateTime column as the index
@@ -343,8 +360,8 @@ def merge_spectra_logfile(spectra_path: str = 'data', logfile_path: str = 'data'
         # Make a column for the number of the spectrum
         merged_data['Number'] = [int(file.split('.')[0].split('_')[-1]) for file in spectra_filenames]
 
-    except:
-        raise ValueError('Error with merging spectra and logfile!')
+    except Exception as e:
+        print('Error during merging: {}'.format(e))
     
     try:
         # Drop the spectra recorded after the end of the logfile
