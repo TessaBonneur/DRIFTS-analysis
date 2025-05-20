@@ -425,6 +425,7 @@ def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background
         # Add the temperature column to the corrected DataFrame
         corrected_reaction[temp_column] = reaction_spectra[temp_column]
 
+
     return corrected_reaction, temp_diffs
 
 def linear_baseline_correction(spectra: pd.DataFrame, type: Literal['v1', 'v2'] = 'v1', area: tuple= (2600, 2400), temp_column: str = None):
@@ -490,7 +491,7 @@ def linear_baseline_correction(spectra: pd.DataFrame, type: Literal['v1', 'v2'] 
         return spectra_v2_corrected
     
 
-def split_lightoff_lightout(data):
+def split_lightoff_lightout(data, temperatures):
     '''
     Split the spectra into lightoff and lightout.
 
@@ -505,12 +506,16 @@ def split_lightoff_lightout(data):
     DF_lightoff = data.iloc[:len(data)//2,:]
     DF_lightout = data.iloc[len(data)//2:,:]
 
-    if DF_lightoff['T'].iloc[-1] == DF_lightout['T'].iloc[0]:
+    # Get the lightoff and lightout temperatures
+    lightoff_temperatures = temperatures[:len(temperatures)//2]
+    lightout_temperatures = temperatures[len(temperatures)//2:]
+
+    if lightoff_temperatures.iloc[-1] == lightout_temperatures.iloc[0]:
         print('Lightoff and lightout temperatures match')
     else:
         raise ValueError('Lightoff and lightout temperatures DO NOT match, do not use this data')
     
-    return DF_lightoff, DF_lightout
+    return DF_lightoff, lightoff_temperatures, DF_lightout, lightout_temperatures
 
 def import_gc_data_and_merge(gc_folder: str = 'GC/', DF_logfile = None):
     '''
@@ -801,3 +806,88 @@ def append_lightoff(lightoff_IR = None, lightoff_GC = None, lightout_IR = None, 
         lightoff_temperatures_new.to_csv(r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\Lightoff temperatures.csv')
 
     return lightoff_temperatures_new
+
+
+def plot_spectra_temperatures(spectra_to_plot, temperatures, skip, title, colormap_string, folder, xlim = None, ylim = None, figsize = (18,10), **kwargs):
+    """
+    Plot the spectra with the temperatures as labels.
+    Parameters:
+    - spectra_to_plot: DataFrame with the spectra to plot. The index should be the filenames and the columns should be the wavenumbers.
+    - temperatures: List of temperatures to use as labels.
+    - skip: Number of spectra to skip between each plot. Default is 10.
+    - title: Title of the plot.
+    - colormap_string: String to define the colormap. Options are 'coolwarm', 'combined', 'lightoff', 'lightout'.
+    - folder: Folder to save the plot.
+    - kwargs: Additional arguments to pass to the plot function.
+    Returns:
+    - A plot of the spectra with the temperatures as labels.
+    """
+
+    if colormap_string == 'combined':
+        colormap1 = plt.cm.Reds(np.linspace(0.3, 1, len(spectra_to_plot)//2))
+        colormap2 = plt.cm.Blues(np.linspace(1, 0.3, len(spectra_to_plot)//2))
+        colormap = np.vstack((colormap1, colormap2))
+
+    elif colormap_string == 'lightoff':
+        colormap = plt.cm.coolwarm(np.linspace(0, 1, len(spectra_to_plot)))
+
+    elif colormap_string == 'lightout':
+        colormap = plt.cm.coolwarm(np.linspace(1, 0, len(spectra_to_plot)))
+    else:
+        print('Colormap not recognized. Using default colormap.')
+        colormap = plt.cm.coolwarm(np.linspace(0, 1, len(spectra_to_plot)))
+
+    fig, ax = plt.subplots(figsize = figsize)
+    
+    for n in np.arange(0, len(spectra_to_plot), skip):  # plotting until -1 to skip the T column
+        ax.plot(spectra_to_plot.columns[:-1], spectra_to_plot.iloc[n,:-1], label=temperatures[n], c=colormap[n], **kwargs)
+
+    ax.set_xlabel('Wavenumber (cm$^{-1}$)')
+    ax.set_ylabel('Intensity')
+    ax.set_title(title)
+
+
+# make a legend with a subset of the data
+
+    if len(ax.get_legend_handles_labels()[1]) < 50:
+        ax.legend(title = 'T (°C)', loc='upper right', bbox_to_anchor=(1.15, 1.05), fontsize = 12)
+
+    else:
+        print('Too many labels, legend disabled')
+    if xlim:
+        ax.set_xlim(xlim)
+    if ylim:
+        ax.set_ylim(ylim)
+
+# save the figure with the title as filename
+    fig.savefig(folder + '/' + title+'.png', dpi=300, bbox_inches='tight')
+
+    plt.show();
+
+
+def gas_analysis_plot(merged_data, gas_flow = ir.CO_flow):
+
+    # Plot temperature and gas flow over time
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    title = 'Temperature and gas flow overview'
+
+    color = 'tab:red'
+    ax1.set_xlabel('Time (min)')
+    ax1.set_ylabel('Temperature (°C)', color=color, labelpad = 10)
+    ax1.plot(merged_data['Number'], merged_data[ir.Oven_temp], color=color, label='Temperature')
+    ax1.tick_params(axis='y', labelcolor=color)
+
+    # Instantiate a second y-axis
+    ax2 = ax1.twinx()
+    color = 'tab:blue'
+    ax2.set_ylabel('Gas flow (mL/min)', color=color, labelpad = 10)
+    ax2.plot(merged_data['Number'], merged_data[ir.CO_flow], color=color, label='Gas Flow')
+    ax2.tick_params(axis='y', labelcolor=color)
+
+    fig.tight_layout()
+    plt.title(temperature.name + ' (left) and '+ gas_flow.name + ' (right)')
+    plt.grid(alpha = 0.3)
+    plt.show()
+
+    fig.savefig(title + '.png', dpi=300, bbox_inches='tight')
