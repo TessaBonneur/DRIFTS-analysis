@@ -276,7 +276,7 @@ def quick_plot(spectra_to_plot: pd.DataFrame, skip: int=10, save = True):  # mak
     fig, ax = plt.subplots(figsize=(18, 10))
     for n in np.arange(0,len(spectra_to_plot), skip):  # plotting from 1 onwards to skip the background spectrum
         ax.plot(spectra_to_plot.columns[:], spectra_to_plot.iloc[n,:], c=colormap[n])
-    ax.set_xlabel('Wavenumber')
+    ax.set_xlabel('Wavenumber (cm$^{-1}$)')
     ax.set_ylabel('Intensity')
     ax.set_title(title)
     ax.set_xlim(spectra_to_plot.columns[0], spectra_to_plot.columns[-1])  # Invert x-axis
@@ -524,7 +524,7 @@ def split_lightoff_lightout(data, temperatures = None):
     if temperatures is None:
         return DF_lightoff, DF_lightout
     else:
-        return DF_lightoff, DF_lightout, lightoff_temperatures, lightout_temperatures
+        return DF_lightoff, lightoff_temperatures, DF_lightout, lightout_temperatures
 
 def import_gc_data_and_merge(gc_folder: str = 'GC/', DF_logfile = None):
     '''
@@ -542,7 +542,7 @@ def import_gc_data_and_merge(gc_folder: str = 'GC/', DF_logfile = None):
     except Exception as e:
         raise ValueError(f'Error finding GC data folder: {e}')
     time_difference = - pd.Timedelta(minutes = 5, seconds = 55) # GC pc is 5:55 minutes ahead of IR pc
-    date_of_measurement = pd.to_datetime(DF_logfile.index[0]).strftime('%Y-%m-%d')
+    date_of_measurement = pd.to_datetime(DF_logfile['Date'][0]).strftime('%Y-%m-%d')
 
     # Load the GC data
 
@@ -550,17 +550,17 @@ def import_gc_data_and_merge(gc_folder: str = 'GC/', DF_logfile = None):
     gc_data.columns = [col.split('_')[0] for col in gc_data.columns]
 
     # put a time column
-    gc_data['Time'] = gc_data.iloc[:,0]
+    gc_data['Time_GC'] = gc_data.iloc[:,0]
 
     # # drop the original column
     gc_data.drop(columns = gc_data.columns[0], inplace = True)
 
     # # make the time a string
-    gc_data['Time'] = gc_data['Time'].apply(lambda x: x.strftime('%H:%M:%S'))
+    gc_data['Time_GC'] = gc_data['Time_GC'].apply(lambda x: x.strftime('%H:%M:%S'))
 
 
     # Create a datetime column that adjusts for midnight rollover
-    gc_data['DateTime'] = pd.to_datetime(date_of_measurement + ' ' + gc_data['Time'], format='%Y-%m-%d %H:%M:%S') + time_difference
+    gc_data['DateTime'] = pd.to_datetime(date_of_measurement + ' ' + gc_data['Time_GC'], format='%Y-%m-%d %H:%M:%S') + time_difference
 
     # Adjust for midnight rollover
     for i in range(1, len(gc_data)):
@@ -591,8 +591,12 @@ def import_gc_data_and_merge(gc_folder: str = 'GC/', DF_logfile = None):
 
     # merge with logfile
     if DF_logfile is not None:
+        
+        # Make sure the DateTime column in the logfile is a pandas DateTime format
+        DF_logfile['DateTime'] = pd.to_datetime(DF_logfile['DateTime'])
+
         try:
-            gc_data_merged = pd.merge_asof(gc_data.sort_values('DateTime'), DF_logfile.sort_values('DateTime'), on='DateTime', direction='nearest')
+            gc_data_merged = pd.merge_asof(gc_data.sort_index(), DF_logfile.sort_values('DateTime'), on='DateTime', direction='nearest')
             gc_data_merged.index = gc_data_merged['DateTime']
 
             print('Found logfile, merging with GC data.')
@@ -623,6 +627,7 @@ def normalize_on_peak(DF_baselinecorrected, peak_range = (2370, 2360), temp = Tr
     Parameters:
     - DF_baselinecorrected: DataFrame with the baseline corrected spectra. The index should be the filenames and the columns should be the wavenumbers, and may include a temperature column at the end.
     - peak_range: Range of wavenumbers to use for the peak maximum. Default is (2370, 2360).
+    - temp: Boolean to indicate if the temperature column is present. Default is True.
 
     Returns:
     - DF_baselinecorrected_normalized: DataFrame with the normalized spectra.
@@ -640,7 +645,8 @@ def normalize_on_peak(DF_baselinecorrected, peak_range = (2370, 2360), temp = Tr
 
     DF_baselinecorrected_normalized.columns = DF_baselinecorrected_normalized.columns.astype(float)
 
-    DF_baselinecorrected_normalized['T'] = DF_baselinecorrected['T']
+    if temp == True:
+        DF_baselinecorrected_normalized['T'] = DF_baselinecorrected['T']
 
     
     return DF_baselinecorrected_normalized
@@ -668,7 +674,9 @@ def get_maximum_peak(DF_reaction_backgroundcorrected, peak_range, temp = True):
         DF_reaction_backgroundcorrected_noT.columns = DF_reaction_backgroundcorrected_noT.columns.astype(float)
 
     peak_maximum = DF_reaction_backgroundcorrected_noT.loc[:,peak_range[0]:peak_range[1]].T.max()
-    peak_maximum.index = DF_reaction_backgroundcorrected['T']
+
+    if temp == True:
+        peak_maximum.index = DF_reaction_backgroundcorrected['T']
 
     return peak_maximum
 
@@ -738,7 +746,23 @@ def get_previous_GCdata(prev_exp, experiment_folder):
         print(file_to_open + '. Make sure there is a file named ...merged GC data.csv in the folder')
 
 
-def peak_height_plot(dataset_lightoff, dataset_lightout, normalization_range, peak_maximum_range, lightoff_temp, lightout_temp, title = None):
+def peak_height_plot(dataset_lightoff, dataset_lightout, normalization_range, peak_maximum_range, lightoff_temp, lightout_temp, title = None, xlim = None, ylim = None):
+    """
+    Make a peak height plot of the lightoff and lightout spectra.
+    Parameters:
+    - dataset_lightoff: DataFrame with the lightoff spectra. The index should be the filenames and the columns should be the wavenumbers.
+    - dataset_lightout: DataFrame with the lightout spectra. The index should be the filenames and the columns should be the wavenumbers.
+    - normalization_range: Range of wavenumbers to use for the normalization. Default is (2370, 2360).
+    - peak_maximum_range: Range of wavenumbers to use for the peak maximum. Default is (2370, 2360).
+    - lightoff_temp: Temperature at which the lightoff occurs.
+    - lightout_temp: Temperature at which the lightout occurs.
+    - title: Title of the plot. Default is None.
+    - xlim: Range of wavenumbers to use for the x-axis. Default is None.
+    - ylim: Range of wavenumbers to use for the y-axis. Default is None.
+    Returns:
+    - A plot of the peak height vs temperature.
+    """
+
     # make a scatter plot of temperature 1 vs the maximum of the peaks in the fresh dataset
     fig, ax = plt.subplots(1, 1, figsize=(4, 3), constrained_layout=True)
 
@@ -763,39 +787,48 @@ def peak_height_plot(dataset_lightoff, dataset_lightout, normalization_range, pe
 
     ax.legend(fontsize = 15, loc = 'upper right')
     ax.tick_params(labelsize=16)
-    ax.set_ylim(0, 1)
-    # ax.grid(False)
-    ax.set_xlabel('Temperature (°C)', fontsize = 15, labelpad = 5)
+
+    # set the xlim to the range of the dataset
+    if xlim:
+        ax.set_xlim(xlim)
+    else:
+        pass
+    # set the ylim to the range of the dataset
+    if ylim:
+        ax.set_ylim(ylim)
+    else:
+        ax.set_ylim(0,1)
+
+    ax.grid(False)
+    ax.set_xlabel('Temperature (\u00B0C)', fontsize = 15, labelpad = 5)
     ax.set_ylabel('Rel. peak height (a.u.)', fontsize = 15, labelpad = 6)
     ax.label_outer()
     ax.set_xticks([100, 200, 300, 400])
+
+
 
     if title:
         fig.savefig(title+'.png', dpi=300, bbox_inches='tight')
 
 
-def save_lightoff(lightoff_IR, lightoff_GC, lightout_IR, lightout_GC):    # call this filename
+def save_lightoff(GC_lightoff = None, GC_lightout = None, IR_lightoff_CO = None, IR_lightout_CO = None, IR_lightoff_CO2 = None, IR_lightout_CO2 = None):    # call this filename
     filename = os.getcwd().split('\\')[-1]
     filename
 
     # export all lightoff temperature to a csv file
-    lightoff_temperatures = pd.DataFrame({'Lightoff IR': [lightoff_IR], 'Lightoff GC': [lightoff_GC], 'Lightout IR': [lightout_IR], 'Lightout GC': [lightout_GC]}, index=[filename])
+    lightoff_temperatures = pd.DataFrame({'Lightoff IR (CO2)': [IR_lightoff_CO2], 'Lightoff GC': [GC_lightoff], 'Lightout IR (CO2)': [IR_lightout_CO2], 'Lightout GC': [GC_lightout], 'Lightoff IR (CO)': [IR_lightoff_CO], 'Lightout IR (CO)': [IR_lightout_CO]}, index=[filename])
     lightoff_temperatures.to_csv(r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\Lightoff temperatures.csv')
 
     pd.read_csv(r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\Lightoff temperatures.csv', index_col=0)
     return lightoff_temperatures
 
 
-def append_lightoff(lightoff_IR = None, lightoff_GC = None, lightout_IR = None, lightout_GC = None):    # call this filename
-    
-
-    # call this filename
-    filename = os.getcwd().split('\\')[-1]
+def append_lightoff(filename, GC_lightoff = None, GC_lightout = None, IR_lightoff_CO = None, IR_lightout_CO = None, IR_lightoff_CO2 = None, IR_lightout_CO2 = None):    # call this filename
 
     # read the file
     lightoff_temperatures = pd.read_csv(r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\Lightoff temperatures.csv', index_col=0)
 
-    if lightoff_IR == None and lightoff_GC == None and lightout_IR == None and lightout_GC == None:
+    if IR_lightoff_CO == None and GC_lightoff == None and IR_lightout_CO == None and GC_lightout == None and IR_lightoff_CO2 == None and IR_lightout_CO2 == None:
         return lightoff_temperatures
     else:
         # check if the row name already exists
@@ -803,14 +836,17 @@ def append_lightoff(lightoff_IR = None, lightoff_GC = None, lightout_IR = None, 
             print('Row already exists, overwriting')
             # remove the row with the same name
             lightoff_temperatures = lightoff_temperatures.drop(filename)
-
+            print('Appended new row:', filename)
         else:
-            print('Row does not exist, adding new row')
+            print('Row does not exist, adding new row:', filename)
         
         # append the new lightoff temperatures to the file
-        lightoff_temperatures_new = pd.concat([lightoff_temperatures, pd.DataFrame({'Lightoff IR': [lightoff_IR], 'Lightoff GC': [lightoff_GC], 'Lightout IR': [lightout_IR], 'Lightout GC': [lightout_GC]}, index=[filename])])
+        lightoff_temperatures_new = pd.concat([lightoff_temperatures, pd.DataFrame({'Lightoff IR (CO2)': [IR_lightoff_CO2], 'Lightout IR (CO2)': [IR_lightout_CO2], 'Lightoff GC': [GC_lightoff], 'Lightout GC': [GC_lightout], 'Lightoff IR (CO)': [IR_lightoff_CO], 'Lightout IR (CO)': [IR_lightout_CO]}, index=[filename])])
         lightoff_temperatures_new.sort_index(inplace=True)
         
+        # sort the columns by name
+        lightoff_temperatures_new = lightoff_temperatures_new.reindex(sorted(lightoff_temperatures_new.columns), axis=1)
+
         # export the file
         lightoff_temperatures_new.to_csv(r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\Lightoff temperatures.csv')
 
@@ -859,7 +895,7 @@ def plot_spectra_temperatures(spectra_to_plot, temperatures, skip, title, colorm
 # make a legend with a subset of the data
 
     if len(ax.get_legend_handles_labels()[1]) < 50:
-        ax.legend(title = 'T (°C)', loc='upper right', bbox_to_anchor=(1.15, 1.05), fontsize = 12)
+        ax.legend(title = 'T (\u00B0C)', loc='upper right', bbox_to_anchor=(1.15, 1.05), fontsize = 12)
 
     else:
         print('Too many labels, legend disabled')
@@ -874,7 +910,7 @@ def plot_spectra_temperatures(spectra_to_plot, temperatures, skip, title, colorm
     plt.show();
 
 
-def gas_analysis_plot(merged_data, gas_flow = CO_flow):
+def gas_analysis_plot(merged_data, folder, gas_flow = CO_flow):
 
     # Plot temperature and gas flow over time
     fig, ax1 = plt.subplots(figsize=(12, 6))
@@ -883,7 +919,7 @@ def gas_analysis_plot(merged_data, gas_flow = CO_flow):
 
     color = 'tab:red'
     ax1.set_xlabel('Time (min)')
-    ax1.set_ylabel('Temperature (°C)', color=color, labelpad = 10)
+    ax1.set_ylabel('Temperature (\u00B0C)', color=color, labelpad = 10)
     ax1.plot(merged_data['Number'], merged_data[Oven_temp], color=color, label='Temperature')
     ax1.tick_params(axis='y', labelcolor=color)
 
@@ -899,4 +935,97 @@ def gas_analysis_plot(merged_data, gas_flow = CO_flow):
     plt.grid(alpha = 0.3)
     plt.show()
 
-    fig.savefig(title + '.png', dpi=300, bbox_inches='tight')
+    fig.savefig(folder + '/' + title+'.png', dpi=300, bbox_inches='tight')
+
+def plot_COox_conversion(gc_data_reaction, reaction_start, reaction_end, folder):
+    """
+    Plot the GC data for CO conversion and CO2 formation during the reaction.
+    Parameters:
+    gc_data (pd.DataFrame): The GC data DataFrame.
+    reaction_start (pd.Timestamp): The start time of the reaction.
+    reaction_end (pd.Timestamp): The end time of the reaction.
+    """
+
+    gc_data_reaction.loc[:, 'X(CO)'] = 1 - (gc_data_reaction['CO'] / gc_data_reaction['CO'].max())
+    gc_data_reaction.loc[:, 'X(CO) (%)'] = 100 * gc_data_reaction['X(CO)']
+
+    gc_data_reaction.loc[:, 'X(CO2)'] = (gc_data_reaction['CO2'] / gc_data_reaction['CO2'].max())
+    gc_data_reaction.loc[:, 'X(CO2) (%)'] = 100 * gc_data_reaction['X(CO2)']
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    gc_data_reaction.plot(x='Time',y='X(CO) (%)', ax=ax, title='GC data for CO conversion during reaction')
+    gc_data_reaction.plot(x='Time',y='X(CO2) (%)',ax=ax, title='GC data for CO2 formation during reaction')
+
+    ax.set_title('CO conversion and CO2 formation')
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Conversion or formation (%)')
+
+    fig.savefig(folder + '/' + 'GC data for CO conversion and CO2 formation during reaction.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+def plot_lightoff(gc_lightoff, gc_lightout, folder, gas: str = 'CO'):
+    fig, ax = plt.subplots(figsize = (10, 4.5), constrained_layout=True)
+
+    if gas == 'CO':
+        title = 'Lightoff curves X(' + gas + ')'
+    elif gas == 'CO2':
+        title = 'Lightoff curves C(' + gas + ')'
+
+    if gas == 'CO':
+        ax.plot(gc_lightoff[Oven_temp], gc_lightoff['X(CO) (%)'], 'o--', markersize = 5, c= 'red', label ='Light-off') 
+        ax.plot(gc_lightout[Oven_temp], gc_lightout['X(CO) (%)'], 'o--', markersize = 5, c= 'blue', label = 'Light-out')
+    elif gas == 'CO2':
+        ax.plot(gc_lightoff[Oven_temp], gc_lightoff['X(CO2) (%)'], 'o--', markersize = 5, c= 'red', label ='Light-off') 
+        ax.plot(gc_lightout[Oven_temp], gc_lightout['X(CO2) (%)'], 'o--', markersize = 5, c= 'blue', label = 'Light-out')
+
+
+    # add a horizontal line at 50% conversion
+    ax.axhline(y=50, color='grey', linestyle='--', label = '50% conversion')
+
+    #ax.set_xlim(45, 400)
+    ax.set_xlabel('Temperature (\u00B0C)', labelpad = 10)
+    if gas == 'CO':
+        ax.set_ylabel('X('+ gas + ') (%)', labelpad = 10)
+    elif gas == 'CO2':
+        ax.set_ylabel('C('+ gas + ') (%)', labelpad = 10)
+    ax.legend(loc = 'lower right')
+    ax.set_title(title)
+
+    fig.savefig(folder + '/' + title+'.png', dpi=300, bbox_inches='tight')
+
+def get_lightoff_lightout_temperatures(CO2_peakheights_lightoff, CO2_peakheights_lightout, CO_peakheights_lightoff, CO_peakheights_lightout):
+    """
+    Calculate lightoff and lightout temperatures for CO and CO2 peak heights.
+    Returns a dictionary with all results and prints summary.
+    """
+    # CO2 lightoff
+    lightoff_temperature_CO2_low = CO2_peakheights_lightoff[(CO2_peakheights_lightoff.values <= 0.5) & (CO2_peakheights_lightoff.index > 50) & (CO2_peakheights_lightoff.index < 350)].index[-1]
+    lightoff_temperature_CO2_high = CO2_peakheights_lightoff[(CO2_peakheights_lightoff.values >= 0.5) & (CO2_peakheights_lightoff.index > 50) & (CO2_peakheights_lightoff.index < 350)].index[0]
+    # CO2 lightout
+    lightout_temperature_CO2_high = CO2_peakheights_lightout[(CO2_peakheights_lightout.values <= 0.5) & (CO2_peakheights_lightout.index > 50) & (CO2_peakheights_lightout.index < 350)].index[0]
+    lightout_temperature_CO2_low = CO2_peakheights_lightout[(CO2_peakheights_lightout.values >= 0.5) & (CO2_peakheights_lightout.index > 50) & (CO2_peakheights_lightout.index < 350)].index[-1]
+    # CO lightoff
+    lightoff_temperature_CO_low = CO_peakheights_lightoff[(CO_peakheights_lightoff.values <= 0.5) & (CO_peakheights_lightoff.index > 50) & (CO_peakheights_lightoff.index < 350)].index[0]
+    lightoff_temperature_CO_high = CO_peakheights_lightoff[(CO_peakheights_lightoff.values >= 0.5) & (CO_peakheights_lightoff.index > 50) & (CO_peakheights_lightoff.index < 350)].index[-1]
+    # CO lightout
+    lightout_temperature_CO_high = CO_peakheights_lightout[(CO_peakheights_lightout.values <= 0.5) & (CO_peakheights_lightout.index > 50) & (CO_peakheights_lightout.index < 350)].index[-1]
+    lightout_temperature_CO_low = CO_peakheights_lightout[(CO_peakheights_lightout.values >= 0.5) & (CO_peakheights_lightout.index > 50) & (CO_peakheights_lightout.index < 350)].index[0]
+
+    IR_lightoff_CO2 = (lightoff_temperature_CO2_low + lightoff_temperature_CO2_high)/2
+    IR_lightout_CO2 = (lightout_temperature_CO2_low + lightout_temperature_CO2_high)/2
+    IR_lightoff_CO = (lightoff_temperature_CO_low + lightoff_temperature_CO_high)/2
+    IR_lightout_CO = (lightout_temperature_CO_low + lightout_temperature_CO_high)/2
+
+    print(f'CO2 lightoff temperature is between {lightoff_temperature_CO2_low} and {lightoff_temperature_CO2_high} \u00B0C')
+    print(f'Averaged, this is {round((lightoff_temperature_CO2_low + lightoff_temperature_CO2_high)/2)} \u00B0C')
+    print(f'CO2 lightout temperature is between {lightout_temperature_CO2_low} and {lightout_temperature_CO2_high} \u00B0C')
+    print(f'Averaged, this is {round((lightout_temperature_CO2_low + lightout_temperature_CO2_high)/2)} \u00B0C')
+    print(f'CO lightoff temperature is between {lightoff_temperature_CO_low} and {lightoff_temperature_CO_high} \u00B0C')
+    print(f'Averaged, this is {round((lightoff_temperature_CO_low + lightoff_temperature_CO_high)/2)} \u00B0C')
+    print(f'CO lightout temperature is between {lightout_temperature_CO_low} and {lightout_temperature_CO_high} \u00B0C\n')
+    print(f'Averaged, this is {round((lightout_temperature_CO_low + lightout_temperature_CO_high)/2)} \u00B0C')
+    print(f'Average lightoff temperature is {round((lightoff_temperature_CO_low + lightoff_temperature_CO_high + lightoff_temperature_CO2_low + lightoff_temperature_CO2_high)/4)} \u00B0C')
+    print(f'Average lightout temperature is {round((lightout_temperature_CO_low + lightout_temperature_CO_high + lightout_temperature_CO2_low + lightout_temperature_CO2_high)/4)} \u00B0C')
+
+    return IR_lightoff_CO2, IR_lightout_CO2, IR_lightoff_CO, IR_lightout_CO
