@@ -1,0 +1,34 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Package build artifacts
+*.egg-info/
+build/
+dist/
+
+# VS Code settings
+.vscode/
+
+# Virtual environments (commonly created inside the project folder)
+venv/
+env/
+.venv/
+.env/
+
+# OS-specific files
+.DS_Store       # macOS
+Thumbs.db       # Windows
+
+# Test and coverage tools
+.coverage
+.tox/
+.pytest_cache/
+htmlcov/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
