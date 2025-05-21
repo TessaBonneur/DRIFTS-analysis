@@ -66,8 +66,8 @@ def read_logfile(setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', logfile_path: s
             if setup == 'LP IR VMB':
                 logfile['DateTime'] = pd.to_datetime(logfile['Date'] + ' ' + logfile['Time'], format='%m/%d/%Y %H:%M:%S')
 
-            #global reaction_date
-            #reaction_date = str(logfile['DateTime'].iloc[0].date())  # Store the date of the first measurement for later use
+            global reaction_date
+            reaction_date = str(logfile['DateTime'].iloc[0].date())  # Store the date of the first measurement for later use
 
         except Exception as e:
             raise Exception(f'Error with datetime conversion: {e}')
@@ -491,7 +491,7 @@ def linear_baseline_correction(spectra: pd.DataFrame, type: Literal['v1', 'v2'] 
         return spectra_v2_corrected
     
 
-def split_lightoff_lightout(data, temperatures):
+def split_lightoff_lightout(data, temperatures = None):
     '''
     Split the spectra into lightoff and lightout.
 
@@ -507,15 +507,24 @@ def split_lightoff_lightout(data, temperatures):
     DF_lightout = data.iloc[len(data)//2:,:]
 
     # Get the lightoff and lightout temperatures
-    lightoff_temperatures = temperatures[:len(temperatures)//2]
-    lightout_temperatures = temperatures[len(temperatures)//2:]
+    if temperatures is not None:
+        lightoff_temperatures = temperatures[:len(temperatures)//2]
+        lightout_temperatures = temperatures[len(temperatures)//2:]
 
-    if lightoff_temperatures.iloc[-1] == lightout_temperatures.iloc[0]:
-        print('Lightoff and lightout temperatures match')
+        if lightoff_temperatures.iloc[-1] == lightout_temperatures.iloc[0]:
+            print('Lightoff and lightout temperatures match')
+        else:
+            raise ValueError('Lightoff and lightout temperatures DO NOT match, do not use this data')
     else:
-        raise ValueError('Lightoff and lightout temperatures DO NOT match, do not use this data')
-    
-    return DF_lightoff, lightoff_temperatures, DF_lightout, lightout_temperatures
+        if DF_lightoff['T'].iloc[-1] == DF_lightout['T'].iloc[0]:
+            print('Lightoff and lightout temperatures match')
+        else:
+            raise ValueError('Lightoff and lightout temperatures DO NOT match, do not use this data')
+
+    if temperatures is None:
+        return DF_lightoff, DF_lightout
+    else:
+        return DF_lightoff, DF_lightout, lightoff_temperatures, lightout_temperatures
 
 def import_gc_data_and_merge(gc_folder: str = 'GC/', DF_logfile = None):
     '''
@@ -529,11 +538,11 @@ def import_gc_data_and_merge(gc_folder: str = 'GC/', DF_logfile = None):
         - gc_data: DataFrame with the GC data, indexed by datetime.
     '''
     try:
-        gc_data_path = gc_folder + os.listdir('GC/')[0]
-    except:
-        raise ValueError('No GC data found in the specified path.')
+        gc_data_path = gc_folder + os.listdir(gc_folder)[0]
+    except Exception as e:
+        raise ValueError(f'Error finding GC data folder: {e}')
     time_difference = - pd.Timedelta(minutes = 5, seconds = 55) # GC pc is 5:55 minutes ahead of IR pc
-    date_of_measurement = reaction_date
+    date_of_measurement = pd.to_datetime(DF_logfile.index[0]).strftime('%Y-%m-%d')
 
     # Load the GC data
 
@@ -865,7 +874,7 @@ def plot_spectra_temperatures(spectra_to_plot, temperatures, skip, title, colorm
     plt.show();
 
 
-def gas_analysis_plot(merged_data, gas_flow = ir.CO_flow):
+def gas_analysis_plot(merged_data, gas_flow = CO_flow):
 
     # Plot temperature and gas flow over time
     fig, ax1 = plt.subplots(figsize=(12, 6))
@@ -875,18 +884,18 @@ def gas_analysis_plot(merged_data, gas_flow = ir.CO_flow):
     color = 'tab:red'
     ax1.set_xlabel('Time (min)')
     ax1.set_ylabel('Temperature (°C)', color=color, labelpad = 10)
-    ax1.plot(merged_data['Number'], merged_data[ir.Oven_temp], color=color, label='Temperature')
+    ax1.plot(merged_data['Number'], merged_data[Oven_temp], color=color, label='Temperature')
     ax1.tick_params(axis='y', labelcolor=color)
 
     # Instantiate a second y-axis
     ax2 = ax1.twinx()
     color = 'tab:blue'
     ax2.set_ylabel('Gas flow (mL/min)', color=color, labelpad = 10)
-    ax2.plot(merged_data['Number'], merged_data[ir.CO_flow], color=color, label='Gas Flow')
+    ax2.plot(merged_data['Number'], merged_data[CO_flow], color=color, label='Gas Flow')
     ax2.tick_params(axis='y', labelcolor=color)
 
     fig.tight_layout()
-    plt.title(temperature.name + ' (left) and '+ gas_flow.name + ' (right)')
+    plt.title(str(Oven_temp) + ' (left) and '+ str(gas_flow) + ' (right)')
     plt.grid(alpha = 0.3)
     plt.show()
 

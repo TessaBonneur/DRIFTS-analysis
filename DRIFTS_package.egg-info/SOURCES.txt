@@ -1,0 +1,8 @@
+README.md
+setup.py
+DRIFTS_package/DRIFTS.py
+DRIFTS_package/__init__.py
+DRIFTS_package.egg-info/PKG-INFO
+DRIFTS_package.egg-info/SOURCES.txt
+DRIFTS_package.egg-info/dependency_links.txt
+DRIFTS_package.egg-info/top_level.txt
