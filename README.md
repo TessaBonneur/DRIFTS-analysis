@@ -19,7 +19,7 @@ pip install -e .
 import DRIFTS_package as ir
 ```
 
-## Installation (simplest version)
+## Installation (simplest version, not recommended)
 - Download the repository. 
 - Copy the *DRIFTS_package* folder to the folder where the script you wanna use for analysis is located. Example:
 
