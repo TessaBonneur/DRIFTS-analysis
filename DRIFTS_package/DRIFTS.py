@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
 from jcamp import jcamp_readfile
 from typing import Literal
 
@@ -93,6 +94,12 @@ def read_logfile(setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', logfile_path: s
                 'oven ramp': 'Oven_ramp'
             }, inplace=True)
 
+            # then rename O2 to CO
+            logfile.rename(columns={
+                'O2_sp': 'CO_sp',
+                'O2_flow': 'CO_flow'
+            }, inplace=True)
+
         if setup == 'DeNOx':
             logfile.rename(columns={
                 'SP He Low': 'He_low_sp',
@@ -119,6 +126,7 @@ def read_logfile(setup: Literal['LP IR VMB', 'DeNOx'] = 'DeNOx', logfile_path: s
 
         # Export the logfile to a csv file 
         logfile.to_csv(logfile_path + '/logfile.csv', index=False)
+
 
     # Preview the logfile
     return logfile
@@ -394,7 +402,7 @@ def background_correct_by_temperature(reaction_spectra: pd.DataFrame, background
     - corrected_reaction: DataFrame with background-corrected spectra.
     - temp_diffs: List of temperature differences between reaction and background spectra.
     """
-    # Separate the intensity columns (wavenumbers) from metadata by selecting only float columns
+    # Separate the intensity columns (wavenumbers) from exp_metadata by selecting only float columns
     reaction_intensities = reaction_spectra[[col for col in reaction_spectra.columns if isinstance(col, float)]]
     background_intensities = background_spectra[[col for col in reaction_spectra.columns if isinstance(col, float)]]
 
@@ -619,7 +627,7 @@ lin_CO_Rh0_peak_range = (2060, 2055)
 lin_CO_RhOx_peak_range = (2120, 2115)
 CO2ads_peak_range = (2255, 2250)
 
-def normalize_on_peak(DF_baselinecorrected, peak_range = (2370, 2360), temp = True):
+def normalize_on_peak(DF_baselinecorrected, peak_range = (2370, 2360), temp = False):
     '''
     Normalize the spectra on the peak maximum within a given range.
 
@@ -652,7 +660,7 @@ def normalize_on_peak(DF_baselinecorrected, peak_range = (2370, 2360), temp = Tr
 
 # Define get_maximum_peak function to get the maximum peak in a given range
 
-def get_maximum_peak(DF_reaction_backgroundcorrected, peak_range, temp = True):
+def get_maximum_peak(DF_reaction_backgroundcorrected, peak_range, temp = False):
     '''
     Get the maximum peak value in a given wavenumber range.
 
@@ -683,7 +691,11 @@ def get_maximum_peak(DF_reaction_backgroundcorrected, peak_range, temp = True):
 Pt_experiments = r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Students\Tessa Bonneur\Pt-DRIFTS experiments/'
 Rh_experiments = r'D:\OneDrive - Universiteit Utrecht\Uni\PhD\Students\Jakob Güldenberg\Research-Data-Jan\DRIFTS-Experiments/'
 
-def get_previous_IRdata(prev_exp, experiment_folder):
+def load_experiment_metadata(path: str) -> dict:
+    with open(path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+        
+def get_previous_data(experiment, datatype: str, convert_to_float: bool = False):
     '''
     Retrieve previous IR data from a specified experiment folder.
 
@@ -694,26 +706,21 @@ def get_previous_IRdata(prev_exp, experiment_folder):
     Returns:
     - spectra: DataFrame with the spectra data. The index should be the filenames and the columns should be the wavenumbers.
     '''
-    file_to_open = 'No data found for ' + prev_exp
-
-    for folder in os.listdir(experiment_folder):
-        try:
-            if folder.split(' ')[1] == prev_exp:
-                folder_to_open = folder + '/'
-        except: pass
-
-    for file in os.listdir(experiment_folder+folder_to_open):
-        if file.endswith('background_corrected_spectra_T.csv'):
-            file_to_open = file
-        else:
-            pass
+    all_metadata = load_experiment_metadata(r"D:\OneDrive - Universiteit Utrecht\Uni\PhD\Data\DRIFTS\DRIFTS_experiments_metadata.yaml")
+    exp_metadata = all_metadata[experiment]
+    exp_folder = exp_metadata['root'].replace("\\", '/') + exp_metadata['folder_name']
 
     try:
-        spectra = pd.read_csv(experiment_folder+folder_to_open+file_to_open, index_col=0)
-#        spectra.columns = spectra.columns.astype(float)
-        return spectra
+        DF = pd.read_csv(exp_folder + '/' + datatype + '.csv', index_col=0)
+        print('Found previous ' + datatype + ' data for experiment ' + experiment + '.')
+        if convert_to_float == True:
+            DF.columns = DF.columns.astype(float)  # Convert column names to float if needed
+            print('Converted column names to float for: ' + str(experiment) + ' ' + str(datatype))
+        else:
+            pass
+        return DF
     except:
-        print(file_to_open + '. Make sure there is a file named ...background_corrected_spectra_T.csv in the folder')
+        print('File not found. Make sure there is a file named ' + datatype + ' in the folder')
 
 def get_previous_GCdata(prev_exp, experiment_folder):
     '''
@@ -839,7 +846,7 @@ def save_lightoff(GC_lightoff = None, GC_lightout = None, IR_lightoff_CO = None,
     return lightoff_temperatures
 
 
-def append_lightoff(filename, GC_lightoff = None, GC_lightout = None, IR_lightoff_CO = None, IR_lightout_CO = None, IR_lightoff_CO2 = None, IR_lightout_CO2 = None):    # call this filename
+def append_lightoff(experiment_name = None, GC_lightoff = None, GC_lightout = None, IR_lightoff_CO = None, IR_lightout_CO = None, IR_lightoff_CO2 = None, IR_lightout_CO2 = None):    # call this filename
     '''
     Append or update lightoff and lightout temperatures in the CSV file.
 
@@ -861,18 +868,20 @@ def append_lightoff(filename, GC_lightoff = None, GC_lightout = None, IR_lightof
 
     if IR_lightoff_CO == None and GC_lightoff == None and IR_lightout_CO == None and GC_lightout == None and IR_lightoff_CO2 == None and IR_lightout_CO2 == None:
         return lightoff_temperatures
+    elif experiment_name is None:
+        return lightoff_temperatures
     else:
         # check if the row name already exists
-        if filename in lightoff_temperatures.index:
+        if experiment_name in lightoff_temperatures.index:
             print('Entry already exists, overwriting...')
             # remove the row with the same name
-            lightoff_temperatures = lightoff_temperatures.drop(filename)
-            print('Entry overwritten:', filename)
+            lightoff_temperatures = lightoff_temperatures.drop(experiment_name)
+            print('Entry overwritten:', experiment_name)
         else:
-            print('Entry does not exist, adding new row:', filename)
+            print('Entry does not exist, adding new row:', experiment_name)
         
         # append the new lightoff temperatures to the file
-        lightoff_temperatures_new = pd.concat([lightoff_temperatures, pd.DataFrame({'Lightoff IR (CO2)': [IR_lightoff_CO2], 'Lightout IR (CO2)': [IR_lightout_CO2], 'Lightoff GC': [GC_lightoff], 'Lightout GC': [GC_lightout], 'Lightoff IR (CO)': [IR_lightoff_CO], 'Lightout IR (CO)': [IR_lightout_CO]}, index=[filename])])
+        lightoff_temperatures_new = pd.concat([lightoff_temperatures, pd.DataFrame({'Lightoff IR (CO2)': [IR_lightoff_CO2], 'Lightout IR (CO2)': [IR_lightout_CO2], 'Lightoff GC': [GC_lightoff], 'Lightout GC': [GC_lightout], 'Lightoff IR (CO)': [IR_lightoff_CO], 'Lightout IR (CO)': [IR_lightout_CO]}, index=[experiment_name])])
         lightoff_temperatures_new.sort_index(inplace=True)
         
         # sort the columns by name
@@ -993,7 +1002,7 @@ def gas_analysis_plot(merged_data, folder, gas_flow = CO_flow):
     ax2 = ax1.twinx()
     color = 'tab:blue'
     ax2.set_ylabel('Gas flow (mL/min)', color=color, labelpad = 10)
-    ax2.plot(merged_data['Number'], merged_data[CO_flow], color=color, label='Gas Flow')
+    ax2.plot(merged_data['Number'], merged_data[gas_flow], color=color, label='Gas Flow')
     ax2.tick_params(axis='y', labelcolor=color)
 
     fig.tight_layout()

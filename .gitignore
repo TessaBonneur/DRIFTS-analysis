@@ -32,3 +32,30 @@ htmlcov/
 *.tmp
 *.bak
 *.swp
+
+# Exported data files
+example_data/Background corrected spectra.png
+example_data/Baseline v1 corrected spectra.png
+example_data/Baseline v2 corrected spectra.png
+example_data/CO2 and CO peak heights.png
+example_data/Combined IR and GC lightoff plot.png
+example_data/DF_lightoff_bsl1.csv
+example_data/DF_lightoff_bsl2.csv
+example_data/DF_lightout_bsl1.csv
+example_data/DF_lightout_bsl2.csv
+example_data/DF_reaction_bkg.csv
+example_data/GC data for CO conversion and CO2 formation during reaction.png
+example_data/GC_data_merged.csv
+example_data/Lightoff curves C(CO2).png
+example_data/Lightoff curves X(CO).png
+example_data/Lightoff spectra complete.png
+example_data/Lightoff spectra.png
+example_data/Lightout spectra complete.png
+example_data/Lightout spectra.png
+example_data/Raw spectra.png
+example_data/temp_diffs.csv
+example_data/temp_diffs.png
+example_data/Temperature and gas flow overview.png
+example_data/temperatures_lightoff.csv
+example_data/temperatures_lightout.csv
+example_data/data/logfile.csv

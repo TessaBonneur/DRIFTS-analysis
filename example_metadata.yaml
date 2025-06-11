@@ -1,0 +1,23 @@
+Your_experiment:
+    
+    experiment_name: Example experiment 1
+    folder_name: example_data # Here you should fill in the name of the folder of this specific experiment
+    description: This is an example experiment
+    notes: Here you can write notes like a lab notebook. This appears in the notebook.
+    
+    experiment_type: CO_oxidation
+    setup: DeNOx
+    
+    reaction_gas: CO
+    pretreatment: H2
+
+    root: D:\OneDrive - Universiteit Utrecht\Uni\PhD\Git\DRIFTS-analysis/ # Here you can fill in the root location of all your experiments.
+
+    logfile: /data/
+    spectra: /data/
+    gc: /GC/
+
+    catalyst:
+        metal: Ex
+        support: example
+        catalyst_code: Ex01
