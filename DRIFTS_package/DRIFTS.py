@@ -521,12 +521,12 @@ def split_lightoff_lightout(data, temperatures = None):
         if lightoff_temperatures.iloc[-1] == lightout_temperatures.iloc[0]:
             print('Lightoff and lightout temperatures match')
         else:
-            raise ValueError('Lightoff and lightout temperatures DO NOT match, do not use this data')
+            print('Lightoff and lightout temperatures DO NOT match, take care using this data')
     else:
         if DF_lightoff['T'].iloc[-1] == DF_lightout['T'].iloc[0]:
             print('Lightoff and lightout temperatures match')
         else:
-            raise ValueError('Lightoff and lightout temperatures DO NOT match, do not use this data')
+            print('Lightoff and lightout temperatures DO NOT match, take care using this data')
 
     if temperatures is None:
         return DF_lightoff, DF_lightout
